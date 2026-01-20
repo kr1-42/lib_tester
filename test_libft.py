@@ -45,17 +45,31 @@ class TestRunner:
     def __init__(self):
         self.passed = 0
         self.failed = 0
+        self.use_color = os.getenv("NO_COLOR") is None and sys.stdout.isatty()
+        self.GREEN = "\033[0;32m" if self.use_color else ""
+        self.RED = "\033[0;31m" if self.use_color else ""
+        self.YELLOW = "\033[0;33m" if self.use_color else ""
+        self.BOLD = "\033[1m" if self.use_color else ""
+        self.RESET = "\033[0m" if self.use_color else ""
 
-    def check(self, condition, message):
+    def check(self, condition, message, detail=None):
+        detail_text = f" - {detail}" if detail else ""
         if condition:
             self.passed += 1
+            print(f"{self.GREEN}[PASS]{self.RESET} {message}{detail_text}")
         else:
             self.failed += 1
-            print(f"[FAIL] {message}")
+            print(f"{self.RED}[FAIL]{self.RESET} {message}{detail_text}")
 
     def summary(self):
         total = self.passed + self.failed
-        print(f"\nPassed: {self.passed}/{total}")
+        status = "OK" if self.failed == 0 else "FAILED"
+        color = self.GREEN if self.failed == 0 else self.RED
+        print(
+            f"\n{self.BOLD}Summary:{self.RESET} "
+            f"{color}{status}{self.RESET} "
+            f"({self.passed}/{total} passed)"
+        )
         if self.failed:
             sys.exit(1)
 
