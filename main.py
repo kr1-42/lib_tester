@@ -6,6 +6,12 @@ import sys
 from pathlib import Path
 
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import tests_list
+import tests_split_trim
+
+
 ROOT = Path(__file__).resolve().parents[1]
 BUILD_DIR = Path(__file__).resolve().parent
 SO_PATH = BUILD_DIR / "libft.so"
@@ -235,7 +241,7 @@ def main():
     ptr = libft.ft_strnstr(hay, b"world", 11)
     runner.check(ptr_offset(ptr, base) == 6, "ft_strnstr")
 
-    # strdup, substr, strjoin, strtrim, itoa
+    # strdup, substr, strjoin, itoa
     dup_ptr = libft.ft_strdup(b"copy")
     runner.check(c_string(dup_ptr) == b"copy", "ft_strdup")
     if dup_ptr:
@@ -248,26 +254,10 @@ def main():
     runner.check(c_string(join_ptr) == b"foobar", "ft_strjoin")
     if join_ptr:
         libc.free(join_ptr)
-    trim_ptr = libft.ft_strtrim(b"  hello  ", b" ")
-    runner.check(c_string(trim_ptr) == b"hello", "ft_strtrim")
-    if trim_ptr:
-        libc.free(trim_ptr)
     itoa_ptr = libft.ft_itoa(-12345)
     runner.check(c_string(itoa_ptr) == b"-12345", "ft_itoa")
     if itoa_ptr:
         libc.free(itoa_ptr)
-
-    # split
-    split_ptr = libft.ft_split(b"hello  world", b' ')
-    parts = []
-    if split_ptr:
-        i = 0
-        while split_ptr[i]:
-            parts.append(ctypes.cast(split_ptr[i], ctypes.c_char_p).value)
-            libc.free(split_ptr[i])
-            i += 1
-        libc.free(split_ptr)
-    runner.check(parts == [b"hello", b"world"], "ft_split")
 
     # strmapi
     @ctypes.CFUNCTYPE(ctypes.c_char, ctypes.c_uint, ctypes.c_int)
@@ -311,66 +301,8 @@ def main():
     os.close(rfd)
     runner.check(output == b"hi!\n-12", "ft_put* fd")
 
-    # list functions
-    class TList(ctypes.Structure):
-        pass
-
-    TList._fields_ = [
-        ("content", ctypes.c_void_p),
-        ("next", ctypes.POINTER(TList)),
-    ]
-
-    libft.ft_lstnew.argtypes = [ctypes.c_void_p]
-    libft.ft_lstnew.restype = ctypes.POINTER(TList)
-    libft.ft_lstadd_front.argtypes = [ctypes.POINTER(ctypes.POINTER(TList)), ctypes.POINTER(TList)]
-    libft.ft_lstadd_back.argtypes = [ctypes.POINTER(ctypes.POINTER(TList)), ctypes.POINTER(TList)]
-    libft.ft_lstsize.argtypes = [ctypes.POINTER(TList)]
-    libft.ft_lstsize.restype = ctypes.c_int
-    libft.ft_lstlast.argtypes = [ctypes.POINTER(TList)]
-    libft.ft_lstlast.restype = ctypes.POINTER(TList)
-
-    del_cb = ctypes.CFUNCTYPE(None, ctypes.c_void_p)(lambda p: libc.free(p))
-    iter_cb_vals = []
-
-    @ctypes.CFUNCTYPE(None, ctypes.c_void_p)
-    def iter_cb(ptr):
-        iter_cb_vals.append(ctypes.cast(ptr, ctypes.c_char_p).value)
-
-    @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p)
-    def map_cb(ptr):
-        val = ctypes.cast(ptr, ctypes.c_char_p).value
-        return libc.strdup(val.upper())
-
-    libft.ft_lstdelone.argtypes = [ctypes.POINTER(TList), ctypes.CFUNCTYPE(None, ctypes.c_void_p)]
-    libft.ft_lstclear.argtypes = [ctypes.POINTER(ctypes.POINTER(TList)), ctypes.CFUNCTYPE(None, ctypes.c_void_p)]
-    libft.ft_lstiter.argtypes = [ctypes.POINTER(TList), ctypes.CFUNCTYPE(None, ctypes.c_void_p)]
-    libft.ft_lstmap.argtypes = [ctypes.POINTER(TList), ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p), ctypes.CFUNCTYPE(None, ctypes.c_void_p)]
-    libft.ft_lstmap.restype = ctypes.POINTER(TList)
-
-    head = ctypes.POINTER(TList)()
-    n1 = libft.ft_lstnew(libc.strdup(b"one"))
-    n2 = libft.ft_lstnew(libc.strdup(b"two"))
-    n3 = libft.ft_lstnew(libc.strdup(b"three"))
-    libft.ft_lstadd_front(ctypes.byref(head), n1)
-    libft.ft_lstadd_back(ctypes.byref(head), n2)
-    libft.ft_lstadd_back(ctypes.byref(head), n3)
-
-    runner.check(libft.ft_lstsize(head) == 3, "ft_lstsize")
-    last = libft.ft_lstlast(head)
-    runner.check(c_string(last.contents.content) == b"three", "ft_lstlast")
-    libft.ft_lstiter(head, iter_cb)
-    runner.check(iter_cb_vals == [b"one", b"two", b"three"], "ft_lstiter")
-
-    mapped = libft.ft_lstmap(head, map_cb, del_cb)
-    mapped_vals = []
-    cur = mapped
-    while cur:
-        mapped_vals.append(c_string(cur.contents.content))
-        cur = cur.contents.next
-    runner.check(mapped_vals == [b"ONE", b"TWO", b"THREE"], "ft_lstmap")
-
-    libft.ft_lstclear(ctypes.byref(head), del_cb)
-    libft.ft_lstclear(ctypes.byref(mapped), del_cb)
+    tests_split_trim.run(libft, libc, runner, c_string)
+    tests_list.run(libft, libc, runner, c_string)
 
     runner.summary()
 
